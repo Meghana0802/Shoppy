@@ -2,11 +2,9 @@ from flask import Blueprint,render_template,flash,redirect,request,jsonify
 from .models import Product,Cart,Order
 from flask_login import login_required,current_user
 from . import db
+import uuid
 
 views = Blueprint('views',__name__)
-
-API_PUBLISHABLE_KEY = 'ISPubKey_test_8658611f-da4a-4be3-8c1a-365db089637b'
-API_TOKEN = 'ISSecretKey_test_901b25db-4e80-443f-b8b9-1cc75591a166'
 
 @views.route('/')
 def home():
@@ -128,45 +126,61 @@ def remove_cart():
 @views.route('/place-order')
 @login_required
 def place_order():
-    customer_cart = Cart.query.filter_by(customer_link=current_user.id)
-    if customer_cart:
-        try:
+    try:
+        customer_cart = Cart.query.filter_by(customer_link=current_user.id).all()  # Changed .all() to get all results
+        print(f"Customer cart items: {customer_cart}")  # Debugging line
+
+        if customer_cart:
             total = 0
             for item in customer_cart:
-                total += item.product.current_price*item.quantity
+                total += item.product.current_price * item.quantity
+                print(f"Item: {item.product.product_name}, Quantity: {item.quantity}, Subtotal: {total}")  # Debugging line
 
-            #Razorpay code
-
-            for item in customer_cart:
-                new_order = Order()
-                new_order.quantity = item.quantity
-                new_order.price=item.product.current_price
-                # new_order.status --> remaining will be the payment code
-
-                # new_order.payment_id
-
-                new_order.product_link = item.product_link
-                new_order.customer_link = item.customer_link
-
-                db.session.add(new_order)
-
-                product = Product.query.get(ite.product_link)
-
-                product.in_stock -= item.quantity
-
-                db.session.delete(item)
-
-                db.session.commit()
-
-                flash('Order placed successfully')
-                return redirect('/orders')
-        except Exception as e:
-            print(e)
-            flash('Order not placed')
+            return render_template('payment.html', total_amount=total)
+        else:
+            flash('Your cart is empty')
             return redirect('/')
+    except Exception as e:
+        print(f"Error: {e}")  # Debugging line
+        flash('Order not placed')
+        return redirect('/')
 
-    else:
-        flash('Your cart is empty')
+@views.route('/process_payment', methods=['POST'])
+@login_required
+def process_payment():
+    card_number = request.form['card_number']
+    expiry = request.form['expiry']
+    cvv = request.form['cvv']
+    print(f"Card Number: {card_number}, Expiry: {expiry}, CVV: {cvv}")
+    # Process the mock payment here (validate details, etc.)
+    # Assuming the payment is successful, proceed with the order processing.
+    
+    customer_cart = Cart.query.filter_by(customer_link=current_user.id).all()
+    try:
+        for item in customer_cart:
+            new_order = Order()
+            new_order.quantity = item.quantity
+            new_order.price = item.product.current_price
+            new_order.status = 'Pending'  
+            new_order.payment_id = str(uuid.uuid4())
+
+            new_order.product_link = item.product_link
+            new_order.customer_link = item.customer_link
+
+            db.session.add(new_order)
+
+            product = Product.query.get(item.product_link)
+            product.in_stock -= item.quantity
+
+            db.session.delete(item)
+
+        db.session.commit()
+        
+        flash('Order placed successfully')
+        return redirect('/orders')
+    except Exception as e:
+        print(e)
+        flash('Order not placed')
         return redirect('/')
 
 @views.route('/orders')

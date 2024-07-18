@@ -28,7 +28,9 @@
               <td>{{order.product.product_name}}</td>
               <td>{{order.price}}</td>
               <td>{{order.quantity}}</td>
-              <td><img src="" alt="" style="height:50px;width:50px;border-radius:2px"></td>
+              <td>
+                {% set filename = order.product.product_picture.split('/')[-1] %}
+                <img src="{{ url_for('admin.get_image', filename=filename )}}" alt="" style="height:50px;width:50px;border-radius:2px"></td>
               <td>{{order.status}}</td>
               <td>
                 <a href="/admin/update-order/{{order.id}}">Update Status</a>
